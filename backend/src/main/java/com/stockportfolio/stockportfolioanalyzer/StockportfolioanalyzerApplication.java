@@ -5,9 +5,11 @@ import com.stockportfolio.stockportfolioanalyzer.repository.MarketIndexRepositor
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
+@EnableScheduling
 public class StockportfolioanalyzerApplication {
 
 	public static void main(String[] args) {

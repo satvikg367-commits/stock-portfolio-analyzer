@@ -7,10 +7,10 @@ export default function TickerTape() {
     const [error, setError] = useState(null);
 
     const fetchIndices = () => {
-        setError(null);
         api.get("/indices", { silent: true }).then((res) => {
             const data = (res.data || []).map(mapIndex);
             setIndices(data.length ? data : FALLBACK_INDICES.map(mapIndex));
+            setError(null);
         }).catch((err) => {
             console.error("TickerTape fetch error:", err);
             setIndices(FALLBACK_INDICES.map(mapIndex));
@@ -23,9 +23,11 @@ export default function TickerTape() {
         fetchIndices();
     }, []);
 
+    const hasIndices = indices.length > 0;
+
     // Simulate live ticking over the real data
     useEffect(() => {
-        if (indices.length === 0) return;
+        if (!hasIndices) return;
         
         const interval = setInterval(() => {
             setIndices(prev => prev.map(idx => {
@@ -40,7 +42,7 @@ export default function TickerTape() {
             }));
         }, 3000);
         return () => clearInterval(interval);
-    }, [indices.length > 0]);
+    }, [hasIndices]);
 
     return (
         <div className="ticker-tape">

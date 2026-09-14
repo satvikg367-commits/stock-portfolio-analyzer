@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
 import { getStockPriceQuote } from "../services/marketApi";
+import StockChart from "./StockChart";
 import { useAuth } from "../context/AuthContext";
 import {
     formatCurrency,
@@ -19,7 +20,7 @@ function lookupName(stock) {
 export default function StockDetailModal({ stock, onClose }) {
     const { user } = useAuth();
     const [holding, setHolding] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(!!(stock && user));
     const [quote, setQuote] = useState(null);
     const [quoteError, setQuoteError] = useState("");
 
@@ -27,18 +28,26 @@ export default function StockDetailModal({ stock, onClose }) {
 
     useEffect(() => {
         if (!stock || !user) {
-            setIsLoading(false);
             return;
         }
-        api.get(`/portfolio/user/${user.id}`).then((res) => {
-            const userPortfolio = res.data || [];
-            const specificHolding = userPortfolio.find((h) => h.stockId === stock.id);
-            setHolding(specificHolding || null);
-        }).catch(() => {
-            setHolding(null);
-        }).finally(() => {
-            setIsLoading(false);
-        });
+        let ignore = false;
+        async function fetchData() {
+            setIsLoading(true);
+            try {
+                const res = await api.get("/portfolio");
+                if (ignore) return;
+                const userPortfolio = res.data || [];
+                const specificHolding = userPortfolio.find((h) => h.stockId === stock.id);
+                setHolding(specificHolding || null);
+            } catch {
+                if (ignore) return;
+                setHolding(null);
+            } finally {
+                if (!ignore) setIsLoading(false);
+            }
+        }
+        fetchData();
+        return () => { ignore = true; };
     }, [stock, user]);
 
     useEffect(() => {
@@ -89,6 +98,10 @@ export default function StockDetailModal({ stock, onClose }) {
 
                 {quoteError ? <div className="table-state muted">{quoteError}</div> : null}
 
+                
+                {quote?.symbol || stock?.symbol || queryName ? (
+                    <StockChart symbol={quote?.symbol || stock?.symbol || queryName} />
+                ) : null}
                 <div className="holdings-metrics" style={{ marginBottom: 16 }}>
                     {quote?.nsePrice != null && (
                         <div>

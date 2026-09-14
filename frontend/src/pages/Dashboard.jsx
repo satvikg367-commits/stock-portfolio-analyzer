@@ -69,6 +69,7 @@ function Dashboard() {
     const [quotesBySymbol, setQuotesBySymbol] = useState({});
 
     const loadOverview = useCallback(async () => {
+        await Promise.resolve();
         setIsLoading(true);
         setError("");
 
@@ -94,14 +95,21 @@ function Dashboard() {
     }, []);
 
     useEffect(() => {
-        loadOverview();
+        let isMounted = true;
+        async function run() {
+            if (isMounted) {
+                await loadOverview();
+            }
+        }
+        run();
+        return () => { isMounted = false; };
     }, [loadOverview]);
 
     const { user: authUser } = useAuth();
 
     useEffect(() => {
         if (authUser?.id) {
-            setSelectedUserId(authUser.id);
+            Promise.resolve().then(() => setSelectedUserId(authUser.id));
         }
     }, [authUser]);
 
@@ -131,10 +139,10 @@ function Dashboard() {
 
             try {
                 const [dashboardResponse, portfolioResponse, watchlistResponse, performanceResponse] = await Promise.all([
-                    api.get(`/dashboard/user/${selectedUserId}`),
-                    api.get(`/portfolio/user/${selectedUserId}`),
-                    api.get(`/watchlist/user/${selectedUserId}`),
-                    api.get(`/portfolio/user/${selectedUserId}/performance`),
+                    api.get("/dashboard"),
+                    api.get("/portfolio"),
+                    api.get(`/watchlist`),
+                    api.get("/portfolio/performance"),
                 ]);
 
                 if (!ignore) {
@@ -694,7 +702,7 @@ function Dashboard() {
                                 </thead>
                                 <tbody>
                                     {topPerformers.map((holding) => (
-                                        <tr key={holding.stockId || holding.symbol}>
+                                        <tr key={holding.stockId || holding.symbol} onClick={() => setSelectedQuote({ ...holding, id: holding.stockId })} style={{ cursor: "pointer" }} className="hover-row">
                                             <td>
                                                 <span className="ticker-cell">
                                                     <strong>{holding.symbol}</strong>
@@ -814,7 +822,7 @@ function Dashboard() {
                                 : getStockDailyChange(stock);
                             const price = quote?.price ?? getStockPrice(stock);
                             return (
-                                <div className="watch-row" key={stock.id}>
+                                <div className="watch-row hover-row" key={stock.id} onClick={() => setSelectedQuote(stock)} style={{ cursor: "pointer" }}>
                                     <div>
                                         <strong>{stock.symbol}</strong>
                                         <span>{quote?.companyName || getStockCompany(stock)}</span>

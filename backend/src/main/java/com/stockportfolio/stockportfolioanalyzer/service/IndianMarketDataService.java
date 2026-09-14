@@ -52,42 +52,53 @@ public class IndianMarketDataService {
     }
 
     public StockPriceResponse getCurrentPrice(String stockName) {
-        JsonNode root = getStockDetails(stockName);
+        try {
+            JsonNode root = getStockDetails(stockName);
 
-        String symbol = firstText(root, stockName, "tickerId", "symbol", "ticker");
-        String companyName = firstText(root, stockName, "companyName", "company_name", "name");
+            String symbol = firstText(root, stockName, "tickerId", "symbol", "ticker");
+            String companyName = firstText(root, stockName, "companyName", "company_name", "name");
 
-        JsonNode currentPrice = root.path("currentPrice");
-        Double nsePrice = toDouble(currentPrice.path("NSE"));
-        Double bsePrice = toDouble(currentPrice.path("BSE"));
-        Double price = nsePrice != null ? nsePrice : bsePrice;
-        if (price == null) {
-            price = firstDouble(root, "price", "lastPrice", "currentPrice");
+            JsonNode currentPrice = root.path("currentPrice");
+            Double nsePrice = toDouble(currentPrice.path("NSE"));
+            Double bsePrice = toDouble(currentPrice.path("BSE"));
+            Double price = nsePrice != null ? nsePrice : bsePrice;
+            if (price == null) {
+                price = firstDouble(root, "price", "lastPrice", "currentPrice");
+            }
+
+            if (price == null) throw new IndianApiException(404, "Stock not found.", false);
+
+            Double percentChange = firstDouble(root, "percentChange", "percent_change", "changePercent");
+            
+
+            Double yearHigh = firstDouble(root, "yearHigh", "year_high", "fiftyTwoWeekHigh");
+            Double yearLow = firstDouble(root, "yearLow", "year_low", "fiftyTwoWeekLow");
+            Double dayHigh = firstDouble(root, "dayHigh", "day_high", "high");
+            Double dayLow = firstDouble(root, "dayLow", "day_low", "low");
+            Double previousClose = firstDouble(root, "previousClose", "previous_close", "close");
+
+            StockPriceResponse response = new StockPriceResponse(
+                    symbol,
+                    companyName,
+                    price,
+                    previousClose,
+                    percentChange,
+                    dayHigh,
+                    dayLow,
+                    yearHigh,
+                    yearLow,
+                    firstText(root, "", "date"),
+                    firstText(root, "", "time")
+            );
+            response.setNsePrice(nsePrice);
+            response.setBsePrice(bsePrice);
+            return response;
+        } catch (Exception e) {
+            StockPriceResponse yahooResponse = fetchFromYahoo(stockName);
+            if (yahooResponse != null) return yahooResponse;
+            if (e instanceof IndianApiException) throw (IndianApiException) e;
+            throw new IndianApiException(500, "Unable to fetch market data.", false);
         }
-
-        Double percentChange = firstDouble(root, "percentChange", "percent_change", "changePercent");
-        Double yearHigh = firstDouble(root, "yearHigh", "year_high", "fiftyTwoWeekHigh");
-        Double yearLow = firstDouble(root, "yearLow", "year_low", "fiftyTwoWeekLow");
-        Double dayHigh = firstDouble(root, "dayHigh", "day_high", "high");
-        Double dayLow = firstDouble(root, "dayLow", "day_low", "low");
-        Double previousClose = firstDouble(root, "previousClose", "previous_close", "close");
-
-        StockPriceResponse response = new StockPriceResponse(
-                symbol,
-                companyName,
-                price,
-                previousClose,
-                percentChange,
-                dayHigh,
-                dayLow,
-                yearHigh,
-                yearLow,
-                firstText(root, "", "date"),
-                firstText(root, "", "time")
-        );
-        response.setNsePrice(nsePrice);
-        response.setBsePrice(bsePrice);
-        return response;
     }
 
     public JsonNode getStockDetails(String stockName) {
@@ -352,4 +363,60 @@ public class IndianMarketDataService {
             return null;
         }
     }
+
+    private StockPriceResponse fetchFromYahoo(String symbol) {
+        try {
+            String yahooSymbol = symbol.toUpperCase() + ".NS";
+            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create("https://query2.finance.yahoo.com/v8/finance/chart/" + yahooSymbol + "?interval=1d&range=1d"))
+                .header("User-Agent", "Mozilla/5.0")
+                .GET()
+                .build();
+            java.net.http.HttpResponse<String> response = java.net.http.HttpClient.newHttpClient().send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+            String body = response.body();
+            
+            if (body.contains("\"error\":null") || !body.contains("\"error\":")) {
+                double price = extractDouble(body, "\"regularMarketPrice\":");
+                double prevClose = extractDouble(body, "\"chartPreviousClose\":");
+                double percentChange = prevClose > 0 ? ((price - prevClose) / prevClose) * 100.0 : 0.0;
+                
+                if (price > 0) {
+                    StockPriceResponse spr = new StockPriceResponse(
+                            symbol.toUpperCase(),
+                            symbol.toUpperCase() + " Ltd.",
+                            price,
+                            prevClose,
+                            Math.round(percentChange * 100.0) / 100.0,
+                            extractDouble(body, "\"regularMarketDayHigh\":"),
+                            extractDouble(body, "\"regularMarketDayLow\":"),
+                            extractDouble(body, "\"fiftyTwoWeekHigh\":"),
+                            extractDouble(body, "\"fiftyTwoWeekLow\":"),
+                            "",
+                            ""
+                    );
+                    spr.setNsePrice(price);
+                    return spr;
+                }
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+        return null;
+    }
+
+    private double extractDouble(String json, String key) {
+        int idx = json.indexOf(key);
+        if (idx == -1) return 0.0;
+        int start = idx + key.length();
+        int end = json.indexOf(",", start);
+        int end2 = json.indexOf("}", start);
+        if (end == -1 || (end2 != -1 && end2 < end)) end = end2;
+        if (end == -1) return 0.0;
+        try {
+            return Double.parseDouble(json.substring(start, end).trim());
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
 }

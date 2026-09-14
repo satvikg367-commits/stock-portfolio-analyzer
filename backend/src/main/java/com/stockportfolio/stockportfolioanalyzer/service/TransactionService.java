@@ -29,16 +29,7 @@ public class TransactionService {
 
 
     // CREATE TRANSACTION
-    public Transaction saveTransaction(Transaction transaction) {
-
-        if (transaction.getUser() == null ||
-                transaction.getUser().getId() == null) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "User ID is required"
-            );
-        }
+    public Transaction saveTransaction(Transaction transaction, User authenticatedUser) {
 
         if (transaction.getStock() == null ||
                 transaction.getStock().getId() == null) {
@@ -49,12 +40,7 @@ public class TransactionService {
             );
         }
 
-        User user = userRepository.findById(
-                transaction.getUser().getId()
-        ).orElseThrow(() -> new ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "User not found"
-        ));
+        User user = authenticatedUser; // Use the authenticated user directly!
 
         Stock stock = stockRepository.findById(
                 transaction.getStock().getId()
@@ -129,24 +115,20 @@ public class TransactionService {
 
 
     // GET TRANSACTION BY ID
-    public Transaction getTransactionById(Integer id) {
+    public Transaction getTransactionById(Integer id, User user) {
 
-        return transactionRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Transaction not found"
-                ));
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found"));
+        if (!transaction.getUser().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have access to this transaction");
+        }
+        return transaction;
     }
 
 
     // BUY STOCK
-    public Transaction buyStock(TransactionRequest request) {
+    public Transaction buyStock(TransactionRequest request, User user) {
 
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "User not found"
-                ));
 
         Stock stock = stockRepository.findById(request.getStockId())
                 .orElseThrow(() -> new ResponseStatusException(
@@ -182,13 +164,8 @@ public class TransactionService {
 
 
     // SELL STOCK
-    public Transaction sellStock(TransactionRequest request) {
+    public Transaction sellStock(TransactionRequest request, User user) {
 
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "User not found"
-                ));
 
         Stock stock = stockRepository.findById(request.getStockId())
                 .orElseThrow(() -> new ResponseStatusException(
@@ -236,31 +213,17 @@ public class TransactionService {
 
 
     // GET TRANSACTIONS BY USER
-    public List<Transaction> getTransactionsByUser(Integer userId) {
+    public List<Transaction> getTransactionsByUser(User user) {
 
-        if (!userRepository.existsById(userId)) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "User not found"
-            );
-        }
-
-        return transactionRepository
-                .findByUserIdOrderByTransactionDateDesc(userId);
+        return transactionRepository.findByUserIdOrderByTransactionDateDesc(user.getId());
     }
 
 
     // DELETE TRANSACTION
-    public void deleteTransaction(Integer id) {
+    public void deleteTransaction(Integer id, User user) {
 
-        if (!transactionRepository.existsById(id)) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Transaction not found"
-            );
-        }
-
-        transactionRepository.deleteById(id);
+        Transaction transaction = getTransactionById(id, user);
+        transactionRepository.delete(transaction);
     }
 
 

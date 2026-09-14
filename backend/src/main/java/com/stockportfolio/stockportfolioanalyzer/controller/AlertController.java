@@ -6,8 +6,9 @@ import com.stockportfolio.stockportfolioanalyzer.entity.Stock;
 import com.stockportfolio.stockportfolioanalyzer.entity.User;
 import com.stockportfolio.stockportfolioanalyzer.repository.AlertRepository;
 import com.stockportfolio.stockportfolioanalyzer.repository.StockRepository;
-import com.stockportfolio.stockportfolioanalyzer.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.stockportfolio.stockportfolioanalyzer.security.CurrentUserService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,57 +17,46 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/alerts")
+@RequiredArgsConstructor
 public class AlertController {
-
-    @Autowired
-    private AlertRepository alertRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private StockRepository stockRepository;
+    private final AlertRepository alertRepository;
+    private final StockRepository stockRepository;
+    private final CurrentUserService currentUserService;
 
     @PostMapping
     public ResponseEntity<?> createAlert(@RequestBody AlertRequest request) {
-        Optional<User> userOpt = userRepository.findById(request.getUserId());
+        User user = currentUserService.getCurrentUser();
         Optional<Stock> stockOpt = stockRepository.findById(request.getStockId());
-
-        if (userOpt.isEmpty() || stockOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body("User or Stock not found");
-        }
-
+        if (stockOpt.isEmpty()) return ResponseEntity.badRequest().body("User or Stock not found");
         Alert alert = new Alert();
-        alert.setUser(userOpt.get());
+        alert.setUser(user);
         alert.setStock(stockOpt.get());
         alert.setTargetPrice(request.getTargetPrice());
         alert.setCondition(request.getCondition());
         alert.setActive(request.getActive() != null ? request.getActive() : true);
-
         return ResponseEntity.ok(alertRepository.save(alert));
     }
 
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<Alert>> getAlertsByUser(@PathVariable Integer userId) {
-        return ResponseEntity.ok(alertRepository.findByUserId(userId));
+    @GetMapping
+    public ResponseEntity<List<Alert>> getAlertsByUser() {
+        return ResponseEntity.ok(alertRepository.findByUserId(currentUserService.getCurrentUser().getId()));
     }
 
     @PutMapping("/{id}/deactivate")
     public ResponseEntity<?> deactivateAlert(@PathVariable Integer id) {
         Optional<Alert> alertOpt = alertRepository.findById(id);
-        if (alertOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
+        if (alertOpt.isEmpty()) return ResponseEntity.notFound().build();
         Alert alert = alertOpt.get();
+        if (!alert.getUser().getId().equals(currentUserService.getCurrentUser().getId())) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         alert.setActive(false);
         return ResponseEntity.ok(alertRepository.save(alert));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteAlert(@PathVariable Integer id) {
-        if (!alertRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
-        }
+        Optional<Alert> alertOpt = alertRepository.findById(id);
+        if (alertOpt.isEmpty()) return ResponseEntity.notFound().build();
+        if (!alertOpt.get().getUser().getId().equals(currentUserService.getCurrentUser().getId())) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         alertRepository.deleteById(id);
         return ResponseEntity.ok().build();
     }

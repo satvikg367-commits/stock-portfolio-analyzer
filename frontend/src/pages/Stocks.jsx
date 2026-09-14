@@ -15,6 +15,7 @@ import {
     getStockDailyChange,
     getStockPrice,
 } from "../utils/format";
+import StockDetailModal from "../components/StockDetailModal";
 import { useAuth } from "../context/AuthContext";
 import { getStockPriceQuote } from "../services/marketApi";
 
@@ -60,10 +61,12 @@ function Stocks() {
     const [isLiveMode, setIsLiveMode] = useState(true);
     const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [selectedStock, setSelectedStock] = useState(null);
     const [error, setError] = useState("");
     const [quotesBySymbol, setQuotesBySymbol] = useState({});
 
     const loadStocks = useCallback(async () => {
+        await Promise.resolve();
         setIsLoading(true);
         setError("");
 
@@ -95,13 +98,20 @@ function Stocks() {
 
     useEffect(() => {
         if (user?.id) {
-            api.get(`/watchlist/user/${user.id}`).then((res) => setWatchlist(res.data || [])).catch(console.error);
-            api.get(`/alerts/user/${user.id}`).then((res) => setAlerts(res.data || [])).catch(console.error);
+            api.get("/watchlist").then((res) => setWatchlist(res.data || [])).catch(console.error);
+            api.get("/alerts").then((res) => setAlerts(res.data || [])).catch(console.error);
         }
     }, [user?.id]);
 
     useEffect(() => {
-        loadStocks();
+        let isMounted = true;
+        async function run() {
+            if (isMounted) {
+                await loadStocks();
+            }
+        }
+        run();
+        return () => { isMounted = false; };
     }, [loadStocks]);
 
     const watchlistIds = useMemo(() => watchlist.map((w) => w.stock?.id), [watchlist]);
@@ -144,7 +154,7 @@ function Stocks() {
                 await api.delete(`/watchlist/${existing.id}`);
                 setWatchlist((prev) => prev.filter((w) => w.id !== existing.id));
             } else {
-                const res = await api.post("/watchlist", { userId: user.id, stockId });
+                const res = await api.post("/watchlist", { stockId });
                 setWatchlist((prev) => [...prev, res.data]);
             }
         } catch {
@@ -590,8 +600,9 @@ function Stocks() {
                     stock={selectedAlertStock}
                 />
             )}
+            {selectedStock && <StockDetailModal onClose={() => setSelectedStock(null)} stock={selectedStock} />}
         </div>
-    );
+  );
 }
 
 export default Stocks;

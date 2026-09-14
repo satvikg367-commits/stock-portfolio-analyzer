@@ -8,8 +8,6 @@ import lombok.*;
 @AllArgsConstructor
 public class TransactionRequest {
 
-    private Integer userId;
-
     private Integer stockId;
 
     private Integer quantity;

@@ -6,6 +6,5 @@ import lombok.Setter;
 @Getter
 @Setter
 public class WatchlistRequest {
-    private Integer userId;
     private Integer stockId;
 }

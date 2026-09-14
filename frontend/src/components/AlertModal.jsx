@@ -39,7 +39,6 @@ export default function AlertModal({ stock, existingAlert, onClose, onAlertSaved
             }
 
             const payload = {
-                userId: user.id,
                 stockId: stock.id,
                 targetPrice: target,
                 condition,

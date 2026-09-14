@@ -2185,3 +2185,9 @@ input, select, button, .form-control {
         grid-template-columns: 1fr;
     }
 }
+
+
+.hover-row:hover {
+    background: var(--surface-soft) !important;
+    opacity: 0.9;
+}

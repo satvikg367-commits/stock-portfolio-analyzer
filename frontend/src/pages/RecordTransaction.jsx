@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 import api, { getApiError } from "../services/api";
 import {
@@ -19,10 +20,10 @@ const initialForm = {
 };
 
 function RecordTransaction() {
+    const { user } = useAuth();
     const navigate = useNavigate();
     const [form, setForm] = useState(initialForm);
-    const [users, setUsers] = useState([]);
-    const [stocks, setStocks] = useState([]);
+        const [stocks, setStocks] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState("");
@@ -36,22 +37,17 @@ function RecordTransaction() {
             setError("");
 
             try {
-                const [usersResponse, stocksResponse] = await Promise.all([
-                    api.get("/users"),
-                    api.get("/stocks"),
-                ]);
+                const stocksResponse = await api.get("/stocks");
 
                 if (ignore) {
                     return;
                 }
 
-                const nextUsers = usersResponse.data || [];
-                const nextStocks = stocksResponse.data || [];
-                setUsers(nextUsers);
-                setStocks(nextStocks);
+                                const nextStocks = stocksResponse.data || [];
+                                setStocks(nextStocks);
                 setForm((currentForm) => ({
                     ...currentForm,
-                    userId: currentForm.userId || nextUsers[0]?.id || "",
+                    userId: user?.id || "",
                     stockId: currentForm.stockId || nextStocks[0]?.id || "",
                     price:
                         currentForm.price ||
@@ -108,7 +104,6 @@ function RecordTransaction() {
 
         try {
             const payload = {
-                user: { id: Number(form.userId) },
                 stock: { id: Number(form.stockId) },
                 quantity: Number(form.quantity),
                 price: Number(form.price),
@@ -120,7 +115,6 @@ function RecordTransaction() {
             setSuccess("Transaction recorded successfully.");
             setForm({
                 ...initialForm,
-                userId: form.userId,
                 stockId: form.stockId,
                 price: selectedStock ? String(getStockPrice(selectedStock)) : "",
             });
@@ -148,20 +142,11 @@ function RecordTransaction() {
                         <span>User Profile</span>
                         <div className="input-shell">
                             <span className="material-symbols-outlined">person</span>
-                            <select
-                                disabled={isLoading}
-                                name="userId"
-                                onChange={updateField}
-                                required
-                                value={form.userId}
-                            >
-                                <option value="">Select user</option>
-                                {users.map((user) => (
-                                    <option key={user.id} value={user.id}>
-                                        {user.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <input
+                                disabled
+                                type="text"
+                                value={user?.name || "Loading..."}
+                            />
                         </div>
                     </label>
 

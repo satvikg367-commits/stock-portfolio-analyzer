@@ -4,9 +4,9 @@ const navItems = [
     { to: "/", label: "Dashboard", icon: "dashboard" },
     { to: "/holdings", label: "Holdings", icon: "account_balance_wallet" },
     { to: "/explore", label: "Explore", icon: "explore" },
-    { to: "/users", label: "Users", icon: "group" },
     { to: "/stocks", label: "Stocks", icon: "show_chart" },
     { to: "/transactions", label: "Transactions", icon: "receipt_long" },
+    { to: "/profile", label: "Profile", icon: "person" },
 ];
 
 function Sidebar() {

@@ -22,7 +22,7 @@ function LiveMarketWatcher() {
             return;
         }
 
-            api.get(`/alerts/user/${user.id}`, { silent: true })
+            api.get("/alerts", { silent: true })
             .then((res) => {
                 alertsRef.current = res.data || [];
             })

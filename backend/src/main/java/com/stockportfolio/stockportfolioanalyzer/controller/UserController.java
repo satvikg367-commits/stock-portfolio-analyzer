@@ -1,53 +1,43 @@
 package com.stockportfolio.stockportfolioanalyzer.controller;
 
-import com.stockportfolio.stockportfolioanalyzer.dto.UserUpdateRequest;
+import com.stockportfolio.stockportfolioanalyzer.dto.ProfileUpdateRequest;
 import com.stockportfolio.stockportfolioanalyzer.entity.User;
+import com.stockportfolio.stockportfolioanalyzer.security.CurrentUserService;
 import com.stockportfolio.stockportfolioanalyzer.service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/users")
+@RequiredArgsConstructor
 public class UserController {
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
+    private final CurrentUserService currentUserService;
 
-    // CREATE USER
-    @PostMapping
-    public User saveUser(@RequestBody User user) {
-        return userService.saveUser(user);
-    }
-
-    // GET ALL USERS
     @GetMapping
-    public List<User> getAllUsers() {
-        return userService.getAllUsers();
+    public List<User> getOnlyCurrentUser() {
+        return List.of(currentUserService.getCurrentUser());
     }
 
-    // GET USER BY ID
-    @GetMapping("/{id}")
-    public User getUserById(@PathVariable Integer id) {
-        return userService.getUserById(id);
+    @GetMapping("/me")
+    public User getCurrentUser() {
+        return currentUserService.getCurrentUser();
     }
 
-    // UPDATE USER
-    @PutMapping("/{id}")
-    public User updateUser(
-            @PathVariable Integer id,
-            @RequestBody UserUpdateRequest request) {
-
-        return userService.updateUser(id, request);
+    @PutMapping("/me")
+    public User updateCurrentUser(@RequestBody ProfileUpdateRequest request) {
+        return userService.updateProfile(currentUserService.getCurrentUser(), request);
     }
 
-    // DELETE USER
-    @DeleteMapping("/{id}")
-    public String deleteUser(@PathVariable Integer id) {
-
-        userService.deleteUser(id);
-
-        return "User deleted successfully";
+    @PutMapping("/me/password")
+    public User changePassword(@RequestBody com.stockportfolio.stockportfolioanalyzer.dto.PasswordChangeRequest request) {
+        return userService.changePassword(currentUserService.getCurrentUser(), request);
     }
 }

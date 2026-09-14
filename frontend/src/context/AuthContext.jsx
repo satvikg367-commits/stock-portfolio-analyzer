@@ -1,94 +1,31 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
+import api from "../services/api";
 
 const AuthContext = createContext(null);
+const TOKEN_KEY = "spa.auth.token";
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const hasToken = typeof sessionStorage !== "undefined" && !!sessionStorage.getItem(TOKEN_KEY);
+    const [isLoading, setIsLoading] = useState(hasToken);
 
     useEffect(() => {
-        // Mock checking for existing session
-        const storedUser = localStorage.getItem("spa.auth.user");
-        if (storedUser) {
-            try {
-                setUser(JSON.parse(storedUser));
-            } catch (e) {
-                console.error("Failed to parse user from local storage");
-            }
+        if (!hasToken) {
+            return undefined;
         }
-        setIsLoading(false);
-    }, []);
+        api.get("/users/me", { silent: true }).then((response) => setUser(response.data))
+            .catch(() => sessionStorage.removeItem(TOKEN_KEY)).finally(() => setIsLoading(false));
+        return undefined;
+    }, [hasToken]);
 
-    const login = async (email, password) => {
-        // Mock login
-        return new Promise((resolve, reject) => {
-            setTimeout(() => {
-                if (email && password) {
-                    const mockUser = { id: 1, name: email.split("@")[0], email };
-                    setUser(mockUser);
-                    localStorage.setItem("spa.auth.user", JSON.stringify(mockUser));
-                    toast.success("Successfully logged in");
-                    resolve(mockUser);
-                } else {
-                    reject(new Error("Invalid credentials"));
-                }
-            }, 1000);
-        });
-    };
-
-    const loginWithGoogle = async () => {
-        // Mock Google Login
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                const mockUser = { id: 2, name: "Google User", email: "user@gmail.com" };
-                setUser(mockUser);
-                localStorage.setItem("spa.auth.user", JSON.stringify(mockUser));
-                toast.success("Successfully logged in with Google");
-                resolve(mockUser);
-            }, 1000);
-        });
-    };
-
-    const signup = async (email, password, name) => {
-        // Mock signup
-        return new Promise((resolve, reject) => {
-            setTimeout(() => {
-                if (email && password && name) {
-                    const mockUser = { id: 3, name, email };
-                    setUser(mockUser);
-                    localStorage.setItem("spa.auth.user", JSON.stringify(mockUser));
-                    toast.success("Account created successfully");
-                    resolve(mockUser);
-                } else {
-                    reject(new Error("Please fill in all fields"));
-                }
-            }, 1000);
-        });
-    };
-
-    const logout = () => {
-        setUser(null);
-        localStorage.removeItem("spa.auth.user");
-        toast.info("Logged out successfully");
-    };
-
-    const value = {
-        user,
-        isLoading,
-        login,
-        loginWithGoogle,
-        signup,
-        logout,
-    };
-
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+    const setSession = (response) => { sessionStorage.setItem(TOKEN_KEY, response.data.token); setUser(response.data.user); return response.data.user; };
+    const login = async (email, password) => { const userData = setSession(await api.post("/auth/login", { email, password })); toast.success("Successfully logged in"); return userData; };
+    const signup = async (email, password, name) => { const userData = setSession(await api.post("/auth/signup", { email, password, name })); toast.success("Account created successfully"); return userData; };
+    const updateUser = (nextUser) => setUser(nextUser);
+    const logout = () => { setUser(null); sessionStorage.removeItem(TOKEN_KEY); toast.info("Logged out successfully"); };
+    return <AuthContext.Provider value={{ user, isLoading, login, signup, updateUser, logout }}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-    const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error("useAuth must be used within an AuthProvider");
-    }
-    return context;
-}
+// eslint-disable-next-line react-refresh/only-export-components
+export function useAuth() { const context = useContext(AuthContext); if (!context) throw new Error("useAuth must be used within an AuthProvider"); return context; }

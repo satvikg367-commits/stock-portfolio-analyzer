@@ -6,8 +6,6 @@ import Topbar from "./components/Topbar";
 import Dashboard from "./pages/Dashboard";
 import Holdings from "./pages/Holdings";
 import Explore from "./pages/Explore";
-import Users from "./pages/Users";
-import AddUser from "./pages/AddUser";
 import Stocks from "./pages/Stocks";
 import AddStock from "./pages/AddStock";
 import Transactions from "./pages/Transactions";
@@ -48,8 +46,6 @@ function AppContent() {
                             <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
                             <Route path="/holdings" element={<ProtectedRoute><Holdings /></ProtectedRoute>} />
                         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                        <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
-                        <Route path="/users/add" element={<ProtectedRoute><AddUser /></ProtectedRoute>} />
                         <Route path="/stocks" element={<ProtectedRoute><Stocks /></ProtectedRoute>} />
                         <Route path="/stocks/add" element={<ProtectedRoute><AddStock /></ProtectedRoute>} />
                         <Route path="/transactions" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />

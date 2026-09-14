@@ -1,55 +1,62 @@
 package com.stockportfolio.stockportfolioanalyzer.service;
 
-import com.stockportfolio.stockportfolioanalyzer.dto.UserUpdateRequest;
+import com.stockportfolio.stockportfolioanalyzer.dto.ProfileUpdateRequest;
 import com.stockportfolio.stockportfolioanalyzer.entity.User;
 import com.stockportfolio.stockportfolioanalyzer.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    // CREATE USER
-    public User saveUser(User user) {
+    public User updateProfile(User user, ProfileUpdateRequest request) {
+        String name = required(request.getName(), "Name is required");
+        String email = required(request.getEmail(), "Email is required").toLowerCase();
+        userRepository.findByEmail(email)
+                .filter(existing -> !existing.getId().equals(user.getId()))
+                .ifPresent(existing -> {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email already exists");
+                });
+        user.setName(name);
+        user.setEmail(email);
+
         return userRepository.save(user);
     }
 
-    // GET ALL USERS
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
-    }
-
-    // GET USER BY ID
-    public User getUserById(Integer id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-    }
-
-    // UPDATE USER
-    public User updateUser(Integer id, UserUpdateRequest request) {
-
-        User existingUser = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        existingUser.setName(request.getName());
-        existingUser.setEmail(request.getEmail());
-        existingUser.setPassword(request.getPassword());
-
-        return userRepository.save(existingUser);
-    }
-
-    // DELETE USER
-    public void deleteUser(Integer id) {
-
-        if (!userRepository.existsById(id)) {
-            throw new RuntimeException("User not found");
+    public User changePassword(User user, com.stockportfolio.stockportfolioanalyzer.dto.PasswordChangeRequest request) {
+        String currentPassword = required(request.getCurrentPassword(), "Current password is required to change password");
+        String newPassword = required(request.getNewPassword(), "New password is required to change password");
+        
+        if (!passwordMatches(currentPassword, user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Current password is incorrect");
         }
+        
+        user.setPassword(passwordEncoder.encode(newPassword.trim()));
+        return userRepository.save(user);
+    }
 
-        userRepository.deleteById(id);
+    private boolean passwordMatches(String submittedPassword, String storedPassword) {
+        if (storedPassword == null || storedPassword.isBlank()) return false;
+        return isBcryptHash(storedPassword)
+                ? passwordEncoder.matches(submittedPassword, storedPassword)
+                : storedPassword.equals(submittedPassword);
+    }
+
+    private boolean isBcryptHash(String value) {
+        return value.startsWith("$2a$") || value.startsWith("$2b$") || value.startsWith("$2y$");
+    }
+
+    private String required(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+        }
+        return value.trim();
     }
 }

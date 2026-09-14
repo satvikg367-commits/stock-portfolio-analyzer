@@ -22,6 +22,7 @@ function Transactions() {
     const [error, setError] = useState("");
 
     const loadTransactions = useCallback(async () => {
+        await Promise.resolve();
         setIsLoading(true);
         setError("");
 
@@ -36,7 +37,14 @@ function Transactions() {
     }, []);
 
     useEffect(() => {
-        loadTransactions();
+        let isMounted = true;
+        async function run() {
+            if (isMounted) {
+                await loadTransactions();
+            }
+        }
+        run();
+        return () => { isMounted = false; };
     }, [loadTransactions]);
 
     async function handleDelete(transactionId) {

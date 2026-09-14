@@ -187,4 +187,82 @@ public class MarketController {
     public ResponseEntity<JsonNode> getCommodities() {
         return ResponseEntity.ok(marketDataService.getCommodities());
     }
+
+    @GetMapping("/chart")
+    public ResponseEntity<java.util.List<Map<String, Object>>> getChart(
+            @RequestParam String symbol,
+            @RequestParam(defaultValue = "1mo") String range
+    ) {
+        String yahooSymbol = normalizeSymbol(symbol).toUpperCase();
+        if (!yahooSymbol.contains(".")) {
+             if (yahooSymbol.contains("NIFTY") || yahooSymbol.contains("SENSEX")) {
+                 if (yahooSymbol.contains("NIFTY 50")) yahooSymbol = "^NSEI";
+                 else if (yahooSymbol.contains("SENSEX")) yahooSymbol = "^BSESN";
+                 else if (yahooSymbol.contains("BANKNIFTY")) yahooSymbol = "^NSEBANK";
+                 else if (yahooSymbol.contains("FINNIFTY")) yahooSymbol = "^CNXFIN";
+                 else if (yahooSymbol.contains("MIDCPNIFTY")) yahooSymbol = "^CRSMID";
+             } else {
+                 yahooSymbol = yahooSymbol + ".NS";
+             }
+        }
+        
+        String interval = "1d";
+        if ("1d".equals(range)) interval = "5m";
+        else if ("5d".equals(range)) interval = "15m";
+        else if ("1mo".equals(range)) interval = "1d";
+        else if ("6mo".equals(range)) interval = "1d";
+        else if ("1y".equals(range)) interval = "1d";
+        else if ("5y".equals(range)) interval = "1wk";
+        else interval = "1d";
+        
+        try {
+            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create("https://query2.finance.yahoo.com/v8/finance/chart/" + yahooSymbol + "?interval=" + interval + "&range=" + range))
+                .header("User-Agent", "Mozilla/5.0")
+                .GET()
+                .build();
+            java.net.http.HttpResponse<String> response = java.net.http.HttpClient.newHttpClient().send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+            String body = response.body();
+            
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(body);
+            com.fasterxml.jackson.databind.JsonNode result = root.path("chart").path("result").get(0);
+            
+            if (result == null || result.isMissingNode()) {
+                return ResponseEntity.ok(java.util.List.of());
+            }
+            
+            com.fasterxml.jackson.databind.JsonNode timestamps = result.path("timestamp");
+            com.fasterxml.jackson.databind.JsonNode closePrices = result.path("indicators").path("quote").get(0).path("close");
+            
+            java.util.List<Map<String, Object>> chartData = new java.util.ArrayList<>();
+            if (timestamps != null && timestamps.isArray()) {
+                for (int i = 0; i < timestamps.size(); i++) {
+                    com.fasterxml.jackson.databind.JsonNode priceNode = closePrices.get(i);
+                    if (priceNode == null || priceNode.isNull() || !priceNode.isNumber()) continue;
+                    double price = priceNode.asDouble();
+                    if (Double.isNaN(price) || price == 0) continue;
+                    long ts = timestamps.get(i).asLong() * 1000;
+                    
+                    String formattedTime;
+                    if ("1d".equals(range) || "5d".equals(range)) {
+                        formattedTime = new java.text.SimpleDateFormat("MMM dd, HH:mm").format(new java.util.Date(ts));
+                    } else {
+                        formattedTime = new java.text.SimpleDateFormat("MMM dd, yyyy").format(new java.util.Date(ts));
+                    }
+                    
+                    chartData.add(Map.of(
+                        "time", formattedTime,
+                        "timestamp", ts,
+                        "price", Math.round(price * 100.0) / 100.0
+                    ));
+                }
+            }
+            return ResponseEntity.ok(chartData);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
+    }
+
 }

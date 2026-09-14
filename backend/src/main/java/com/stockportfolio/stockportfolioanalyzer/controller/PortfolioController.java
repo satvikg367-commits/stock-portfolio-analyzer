@@ -1,51 +1,43 @@
 package com.stockportfolio.stockportfolioanalyzer.controller;
 
 import com.stockportfolio.stockportfolioanalyzer.dto.PortfolioResponse;
+import com.stockportfolio.stockportfolioanalyzer.security.CurrentUserService;
 import com.stockportfolio.stockportfolioanalyzer.service.PortfolioService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/portfolio")
+@RequiredArgsConstructor
 public class PortfolioController {
+    private final PortfolioService portfolioService;
+    private final CurrentUserService currentUserService;
 
-    @Autowired
-    private PortfolioService portfolioService;
-
-    @GetMapping("/user/{userId}")
-    public List<PortfolioResponse> getPortfolio(
-            @PathVariable Integer userId) {
-
-        return portfolioService.getPortfolio(userId);
+    @GetMapping
+    public List<PortfolioResponse> getPortfolio() {
+        return portfolioService.getPortfolio(currentUserService.getCurrentUser().getId());
     }
 
-    @GetMapping("/user/{userId}/performance")
-    public List<java.util.Map<String, Object>> getPortfolioPerformance(@PathVariable Integer userId) {
-        List<PortfolioResponse> portfolio = portfolioService.getPortfolio(userId);
-        double currentTotalValue = portfolio.stream()
-                .mapToDouble(PortfolioResponse::getCurrentValue)
-                .sum();
-
-        List<java.util.Map<String, Object>> performance = new java.util.ArrayList<>();
-        java.time.LocalDate today = java.time.LocalDate.now();
-        
-        // Mock 6 months of data, let's say 1 point per month
+    @GetMapping("/performance")
+    public List<Map<String, Object>> getPortfolioPerformance() {
+        List<PortfolioResponse> portfolio = getPortfolio();
+        double currentTotalValue = portfolio.stream().mapToDouble(PortfolioResponse::getCurrentValue).sum();
+        List<Map<String, Object>> performance = new ArrayList<>();
+        LocalDate today = LocalDate.now();
         for (int i = 5; i >= 0; i--) {
-            java.time.LocalDate date = today.minusMonths(i);
-            // Just a basic random fluctuation around the current value based on i
-            double mockedValue = currentTotalValue * (1.0 - (i * 0.05)); // drops by 5% each month back
-            
-            java.util.Map<String, Object> point = new java.util.HashMap<>();
-            point.put("date", date.toString());
-            point.put("value", Math.round(mockedValue * 100.0) / 100.0);
+            Map<String, Object> point = new HashMap<>();
+            point.put("date", today.minusMonths(i).toString());
+            point.put("value", Math.round(currentTotalValue * (1.0 - (i * 0.05)) * 100.0) / 100.0);
             performance.add(point);
         }
-        
         return performance;
     }
 }
